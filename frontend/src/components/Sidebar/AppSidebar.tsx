@@ -1,5 +1,5 @@
-import { Briefcase, Home, Users } from "lucide-react"
-
+import { BarChart3, Briefcase, Home, Users } from "lucide-react"
+import { useCan } from "@/auth/useCan"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
 import {
@@ -24,13 +24,18 @@ export function AppSidebar() {
     ? [...baseItems, { icon: Users, title: "Admin", path: "/admin" }]
     : baseItems
 
+  const canViewMetrics = useCan("metrics.view")
+  const finalItems = canViewMetrics
+    ? [...items, { icon: BarChart3, title: "Metrics", path: "/metrics" }]
+    : items
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
         <Logo variant="responsive" />
       </SidebarHeader>
       <SidebarContent>
-        <Main items={items} />
+        <Main items={finalItems} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarAppearance />
