@@ -1,0 +1,13 @@
+.vscode/*
+!.vscode/extensions.json
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Secrets — keep credentials out of git even when they are placeholder defaults
+.env
+
+# Python virtualenv at the repo root (sub-projects already ignore their own)
+.venv/
