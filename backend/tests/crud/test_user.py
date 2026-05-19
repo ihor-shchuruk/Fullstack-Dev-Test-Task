@@ -51,9 +51,11 @@ def test_check_if_user_is_active_inactive(db: Session) -> None:
 
 
 def test_check_if_user_is_superuser(db: Session) -> None:
+    from app.models import Role
+
     email = random_email()
     password = random_lower_string()
-    user_in = UserCreate(email=email, password=password, is_superuser=True)
+    user_in = UserCreate(email=email, password=password, role=Role.ADMIN)
     user = crud.create_user(session=db, user_create=user_in)
     assert user.is_superuser is True
 
@@ -67,9 +69,11 @@ def test_check_if_user_is_superuser_normal_user(db: Session) -> None:
 
 
 def test_get_user(db: Session) -> None:
+    from app.models import Role
+
     password = random_lower_string()
     username = random_email()
-    user_in = UserCreate(email=username, password=password, is_superuser=True)
+    user_in = UserCreate(email=username, password=password, role=Role.ADMIN)
     user = crud.create_user(session=db, user_create=user_in)
     user_2 = db.get(User, user.id)
     assert user_2
@@ -78,12 +82,14 @@ def test_get_user(db: Session) -> None:
 
 
 def test_update_user(db: Session) -> None:
+    from app.models import Role
+
     password = random_lower_string()
     email = random_email()
-    user_in = UserCreate(email=email, password=password, is_superuser=True)
+    user_in = UserCreate(email=email, password=password, role=Role.ADMIN)
     user = crud.create_user(session=db, user_create=user_in)
     new_password = random_lower_string()
-    user_in_update = UserUpdate(password=new_password, is_superuser=True)
+    user_in_update = UserUpdate(password=new_password)
     if user.id is not None:
         crud.update_user(session=db, db_user=user, user_in=user_in_update)
     user_2 = db.get(User, user.id)
@@ -143,3 +149,83 @@ def test_user_base_defaults_role_to_member() -> None:
 
     user = UserBase(email="x@example.com")
     assert user.role == Role.MEMBER
+
+
+# --- RBAC: dual-write is_superuser <-> role ---
+
+def test_create_user_with_admin_role_sets_is_superuser_true(db: Session) -> None:
+    from app import crud
+    from app.models import Role, UserCreate
+    from tests.utils.utils import random_email, random_lower_string
+
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=random_email(),
+            password=random_lower_string(),
+            role=Role.ADMIN,
+        ),
+    )
+
+    assert user.role == Role.ADMIN
+    assert user.is_superuser is True
+
+
+def test_create_user_with_member_role_sets_is_superuser_false(db: Session) -> None:
+    from app import crud
+    from app.models import Role, UserCreate
+    from tests.utils.utils import random_email, random_lower_string
+
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=random_email(),
+            password=random_lower_string(),
+            role=Role.MEMBER,
+        ),
+    )
+
+    assert user.role == Role.MEMBER
+    assert user.is_superuser is False
+
+
+def test_update_user_role_to_admin_promotes_is_superuser(db: Session) -> None:
+    from app import crud
+    from app.models import Role, UserCreate, UserUpdate
+    from tests.utils.utils import random_email, random_lower_string
+
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=random_email(), password=random_lower_string(), role=Role.MEMBER
+        ),
+    )
+    assert user.is_superuser is False
+
+    updated = crud.update_user(
+        session=db, db_user=user, user_in=UserUpdate(role=Role.ADMIN)
+    )
+
+    assert updated.role == Role.ADMIN
+    assert updated.is_superuser is True
+
+
+def test_update_user_role_to_member_demotes_is_superuser(db: Session) -> None:
+    from app import crud
+    from app.models import Role, UserCreate, UserUpdate
+    from tests.utils.utils import random_email, random_lower_string
+
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=random_email(), password=random_lower_string(), role=Role.ADMIN
+        ),
+    )
+    assert user.is_superuser is True
+
+    updated = crud.update_user(
+        session=db, db_user=user, user_in=UserUpdate(role=Role.MEMBER)
+    )
+
+    assert updated.role == Role.MEMBER
+    assert updated.is_superuser is False
