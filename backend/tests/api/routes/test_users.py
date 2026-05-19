@@ -519,3 +519,78 @@ def test_delete_user_without_privileges(
     )
     assert r.status_code == 403
     assert r.json()["detail"] == "The user doesn't have enough privileges"
+
+
+# --- RBAC matrix: GET /users/ ---
+
+
+def test_list_users_allowed_for_manager(
+    client: TestClient, manager_token_headers: dict[str, str]
+) -> None:
+    r = client.get(f"{settings.API_V1_STR}/users/", headers=manager_token_headers)
+    assert r.status_code == 200
+
+
+def test_list_users_forbidden_for_member(
+    client: TestClient, member_token_headers: dict[str, str]
+) -> None:
+    r = client.get(f"{settings.API_V1_STR}/users/", headers=member_token_headers)
+    assert r.status_code == 403
+
+
+# --- RBAC matrix: POST /users/ ---
+
+
+def test_create_user_forbidden_for_manager(
+    client: TestClient, manager_token_headers: dict[str, str]
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/users/",
+        headers=manager_token_headers,
+        json={"email": random_email(), "password": random_lower_string()},
+    )
+    assert r.status_code == 403
+
+
+def test_create_user_forbidden_for_member(
+    client: TestClient, member_token_headers: dict[str, str]
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/users/",
+        headers=member_token_headers,
+        json={"email": random_email(), "password": random_lower_string()},
+    )
+    assert r.status_code == 403
+
+
+# --- RBAC matrix: PATCH /users/{id} (update any) ---
+
+
+def test_update_any_user_forbidden_for_manager(
+    client: TestClient, manager_token_headers: dict[str, str], db: Session
+) -> None:
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=random_email(), password=random_lower_string()),
+    )
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/{target.id}",
+        headers=manager_token_headers,
+        json={"full_name": "Should Not Update"},
+    )
+    assert r.status_code == 403
+
+
+# --- RBAC matrix: profile self-update is allowed for every role ---
+
+
+def test_member_can_update_own_profile(
+    client: TestClient, member_token_headers: dict[str, str]
+) -> None:
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me",
+        headers=member_token_headers,
+        json={"full_name": "Member Self Update"},
+    )
+    assert r.status_code == 200
+    assert r.json()["full_name"] == "Member Self Update"

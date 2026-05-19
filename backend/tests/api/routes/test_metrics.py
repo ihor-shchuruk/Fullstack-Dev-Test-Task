@@ -18,3 +18,21 @@ def test_metrics_returns_401_or_403_without_auth(client: TestClient) -> None:
     # Template returns 401 for missing token; this asserts the route exists and
     # the auth dependency runs before the body.
     assert r.status_code in (401, 403)
+
+
+def test_metrics_allowed_for_manager(
+    client: TestClient, manager_token_headers: dict[str, str]
+) -> None:
+    r = client.get(
+        f"{settings.API_V1_STR}/metrics/", headers=manager_token_headers
+    )
+    assert r.status_code == 200
+
+
+def test_metrics_forbidden_for_member(
+    client: TestClient, member_token_headers: dict[str, str]
+) -> None:
+    r = client.get(
+        f"{settings.API_V1_STR}/metrics/", headers=member_token_headers
+    )
+    assert r.status_code == 403

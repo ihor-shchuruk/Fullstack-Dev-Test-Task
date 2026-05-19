@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from app import crud
 from app.core.config import settings
-from app.models import User, UserCreate, UserUpdate
+from app.models import Role, User, UserCreate, UserUpdate
 from tests.utils.utils import random_email, random_lower_string
 
 
@@ -46,4 +46,24 @@ def authentication_token_from_email(
             raise Exception("User id not set")
         user = crud.update_user(session=db, db_user=user, user_in=user_in_update)
 
+    return user_authentication_headers(client=client, email=email, password=password)
+
+
+def authentication_token_for_role(
+    *, client: TestClient, db: Session, email: str, role: Role
+) -> dict[str, str]:
+    """Ensure a user with the given email exists at the given role; return auth headers.
+
+    Idempotent: if the user already exists, the role and password are updated to match
+    the requested values so the returned headers always authenticate successfully.
+    """
+    password = random_lower_string()
+    user = crud.get_user_by_email(session=db, email=email)
+    if user is None:
+        user_in = UserCreate(email=email, password=password, role=role)
+        user = crud.create_user(session=db, user_create=user_in)
+    else:
+        user = crud.update_user(
+            session=db, db_user=user, user_in=UserUpdate(password=password, role=role)
+        )
     return user_authentication_headers(client=client, email=email, password=password)
